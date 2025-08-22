@@ -36,10 +36,21 @@ export class ImageProcessor {
    * 创建ONNX Tensor
    * @param {Float32Array} data - 图像数据
    * @param {number} targetSize - 目标尺寸
+   * @param {Array} shape - 可选的张量形状，默认为 [1, 3, targetSize, targetSize]
    * @returns {ort.Tensor} ONNX Tensor
    */
-  static createTensor(data, targetSize = 224) {
-    return new ort.Tensor("float32", data, [1, 3, targetSize, targetSize]);
+  static createTensor(data, targetSize = 224, shape = null) {
+    // 如果没有指定形状，使用默认形状
+    const tensorShape = shape || [1, 3, targetSize, targetSize];
+    
+    // 如果第一个维度是 -1 或 undefined，表示批次大小是灵活的
+    if (tensorShape[0] === -1 || tensorShape[0] === undefined) {
+      tensorShape[0] = 1; // 设置为1
+    }
+    
+    console.log('创建张量，形状:', tensorShape, '数据类型:', typeof data, '数据长度:', data.length);
+    
+    return new ort.Tensor("float32", data, tensorShape);
   }
 
   /**

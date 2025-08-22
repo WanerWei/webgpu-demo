@@ -49,7 +49,6 @@ webgpu-demo/
 │   ├── getOnnx.py           # 导出ResNet18模型
 │   ├── getSimplifiedOnnx.py # 简化模型
 │   ├── testOnnx.py          # 测试模型
-│   ├── manage_models.py     # 统一模型管理
 │   └── requirements.txt     # Python依赖
 ├── docs/                    # 文档
     └── model-preparation.md # 模型准备详细指南

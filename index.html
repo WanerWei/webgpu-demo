@@ -94,6 +94,25 @@
               开始推理
             </button>
             
+            <div class="benchmark-controls">
+              <div class="benchmark-input-group">
+                <label for="benchmarkIterations">推理次数:</label>
+                <input 
+                  type="number" 
+                  id="benchmarkIterations" 
+                  class="benchmark-input" 
+                  value="5" 
+                  min="1" 
+                  max="50"
+                  title="设置性能测试的推理次数"
+                >
+              </div>
+              <button id="benchmarkBtn" class="benchmark-btn" disabled>
+                <i class="fas fa-chart-bar"></i>
+                性能对比
+              </button>
+            </div>
+            
             <div id="loadingSpinner" class="loading-spinner" style="display: none;">
               <i class="fas fa-spinner fa-spin"></i>
               <span>加载中...</span>
@@ -144,8 +163,10 @@
     </footer>
   </div>
 
-  <!-- 引入 onnxruntime-web -->
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <!-- 引入 onnxruntime-web (包含所有后端) -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script> -->
+  <!-- 或者使用包含所有后端的版本 -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.all.min.js"></script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
