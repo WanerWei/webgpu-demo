@@ -1,0 +1,17 @@
+# 模型准备脚本依赖
+requests>=2.25.1
+numpy>=1.21.0
+Pillow>=8.3.0
+
+# ONNX相关依赖（可选，用于模型验证和测试）
+onnx>=1.12.0
+onnxruntime>=1.12.0
+
+# 模型转换依赖（可选，用于从其他框架转换模型）
+torch>=1.12.0
+torchvision>=0.13.0
+tensorflow>=2.8.0
+tf2onnx>=1.12.0
+
+# 模型优化依赖（可选）
+onnxsim>=0.4.0 

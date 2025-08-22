@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebGPU + ONNX Runtime Web - 智能图像分类</title>
+  <link rel="stylesheet" href="./src/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 头部 -->
+    <header class="header">
+      <div class="container">
+        <div class="header-content">
+          <div class="logo">
+            <i class="fas fa-brain"></i>
+            <h1>WebGPU AI 推理平台</h1>
+          </div>
+          <div class="header-info">
+            <span class="tech-stack">
+              <i class="fas fa-microchip"></i>
+              WebGPU + ONNX Runtime
+            </span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="main">
+      <div class="container">
+        <!-- 状态栏 -->
+        <div id="statusBar" class="status-bar" style="display: none;"></div>
+
+        <!-- 模型选择区域 -->
+        <section class="model-section">
+          <div class="section-header">
+            <h2><i class="fas fa-cogs"></i> 模型配置</h2>
+            <p>选择要使用的AI模型</p>
+          </div>
+          <div class="model-selector">
+            <!-- 模型选择器将通过JavaScript动态创建 -->
+          </div>
+        </section>
+
+        <!-- 图像上传区域 -->
+        <section class="upload-section">
+          <div class="section-header">
+            <h2><i class="fas fa-image"></i> 图像上传</h2>
+            <p>上传要分析的图像文件</p>
+          </div>
+          
+          <div class="upload-area" id="uploadArea">
+            <div class="upload-content">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <h3>拖拽图像到此处或点击选择</h3>
+              <p>支持 JPEG、PNG、WebP 格式，最大 10MB</p>
+              <input type="file" id="imageInput" accept="image/*" class="file-input" />
+              <button class="upload-btn" onclick="document.getElementById('imageInput').click()">
+                <i class="fas fa-folder-open"></i>
+                选择图像
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 图像预览区域 -->
+        <section class="preview-section">
+          <div class="section-header">
+            <h2><i class="fas fa-eye"></i> 图像预览</h2>
+            <p>预览上传的图像</p>
+          </div>
+          
+          <div class="preview-container">
+            <canvas id="canvas" width="224" height="224" class="preview-canvas"></canvas>
+            <div class="canvas-overlay">
+              <span>224×224 像素</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 推理控制区域 -->
+        <section class="inference-section">
+          <div class="section-header">
+            <h2><i class="fas fa-play"></i> 开始推理</h2>
+            <p>运行AI模型进行图像分类</p>
+          </div>
+          
+          <div class="inference-controls">
+            <button id="runBtn" class="run-btn" disabled>
+              <i class="fas fa-rocket"></i>
+              开始推理
+            </button>
+            
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+              <i class="fas fa-spinner fa-spin"></i>
+              <span>加载中...</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 结果展示区域 -->
+        <section class="results-section">
+          <div id="resultsContainer" class="results-container" style="display: none;">
+            <!-- 推理结果将通过JavaScript动态创建 -->
+          </div>
+        </section>
+
+        <!-- 性能信息区域 -->
+        <section class="performance-section">
+          <div class="section-header">
+            <h2><i class="fas fa-tachometer-alt"></i> 性能监控</h2>
+            <p>实时性能指标</p>
+          </div>
+          
+          <div id="performanceInfo" class="performance-info">
+            <!-- 性能信息将通过JavaScript动态创建 -->
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-content">
+          <div class="footer-info">
+            <p>&copy; 2024 WebGPU AI 推理平台. 基于 WebGPU + ONNX Runtime Web 技术构建.</p>
+          </div>
+          <div class="footer-links">
+            <a href="#" class="footer-link">
+              <i class="fab fa-github"></i>
+              GitHub
+            </a>
+            <a href="#" class="footer-link">
+              <i class="fas fa-book"></i>
+              文档
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 引入 onnxruntime-web -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
