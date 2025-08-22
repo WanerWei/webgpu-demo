@@ -19,6 +19,7 @@ torch.onnx.export(
     input_names=['input'],      # 输入层命名
     output_names=['output'],    # 输出层命名
     dynamic_axes=None
+    # 当设定为支持动态 batch size导出时，sessionOptions.executionProviders = ["webgl"]、模型输入张量为[1, 3, 224, 224]会有报错！！
     # dynamic_axes={              # 支持动态 batch size
     #     'input': {0: 'batch_size'}, 
     #     'output': {0: 'batch_size'}
