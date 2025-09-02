@@ -1,24 +1,25 @@
-# WebGPU + ONNX Runtime Web 智能图像分类平台
+# WebGPU AI 平台
 
-一个基于 WebGPU 和 ONNX Runtime Web 的现代化图像分类演示平台，展示了在浏览器中进行高性能 AI 推理的完整解决方案。
+一个基于 WebGPU 和 ONNX Runtime Web 的现代化 AI 推理平台，展示在浏览器中进行高性能机器学习推理的完整解决方案。
 
 ## 🚀 技术特性
 
 - **WebGPU 加速**: 利用最新的 WebGPU API 进行 GPU 加速推理
 - **ONNX Runtime Web**: 使用微软开源的 ONNX Runtime Web 运行时
-- **现代化 UI**: 响应式设计，支持拖拽上传，实时性能监控
-- **多模型支持**: 支持多种预训练模型切换
-- **实时性能监控**: 显示推理时间、内存使用等关键指标
-- **错误处理**: 完善的错误处理和用户反馈机制
+- **React 18**: 现代化前端框架，提供优秀的用户体验
+- **Tailwind CSS**: 实用优先的 CSS 框架，快速构建美观界面
+- **Framer Motion**: 强大的动画库，流畅的交互体验
+- **响应式设计**: 支持各种设备尺寸，移动端友好
 
 ## 🛠️ 技术栈
 
-- **前端框架**: 原生 JavaScript (ES6+)
+- **前端框架**: React 18 + Hooks
+- **路由管理**: React Router 6
+- **样式系统**: Tailwind CSS
+- **动画效果**: Framer Motion
 - **AI 推理**: ONNX Runtime Web + WebGPU
-- **样式**: CSS3 + CSS 变量 + Flexbox/Grid
-- **图标**: Font Awesome 6
-- **字体**: Inter (Google Fonts)
 - **构建工具**: Vite
+- **图标库**: Lucide React
 
 ## 📁 项目结构
 
@@ -27,32 +28,41 @@ webgpu-demo/
 ├── index.html                 # 主页面
 ├── package.json              # 项目配置
 ├── README.md                 # 项目文档
+├── vite.config.js           # Vite 配置
+├── tailwind.config.js       # Tailwind CSS 配置
+├── postcss.config.js        # PostCSS 配置
 ├── src/
-│   ├── main.js              # 主应用逻辑
-│   ├── style.css            # 样式文件
+│   ├── main.jsx             # React 入口文件
+│   ├── App.jsx              # 主应用组件
+│   ├── index.css            # 全局样式
 │   ├── components/
-│   │   └── ui.js            # UI 组件类
-│   ├── models/
-│   │   └── modelManager.js  # 模型管理器
-│   └── utils/
-│       ├── imageProcessor.js # 图像处理工具
-│       ├── performance.js   # 性能监控工具
-│       └── errorHandler.js  # 错误处理工具
+│   │   ├── Layout.jsx       # 布局组件
+│   │   └── ui/
+│   │       └── toaster.jsx  # Toast 通知组件
+│   ├── pages/
+│   │   ├── Home.jsx         # 首页
+│   │   ├── ImageClassification.jsx  # 图像分类页面
+│   │   ├── StyleTransfer.jsx        # 风格迁移页面
+│   │   ├── ObjectDetection.jsx      # 目标检测页面
+│   │   ├── TextGeneration.jsx       # 文本生成页面
+│   │   ├── PerformanceDemo.jsx      # 性能测试页面
+│   │   ├── WebGPUDemo.jsx           # WebGPU 演示页面
+│   │   └── About.jsx                # 关于页面
+│   └── hooks/
+│       └── useToast.js      # Toast Hook
 ├── public/
 │   ├── models/              # ONNX 模型文件
 │   │   ├── resnet18.onnx
 │   │   ├── resnet18_simplified.onnx
-│   │   ├── imagenet_classes.json
-│   │   └── model_config.json
+│   │   └── imagenet_classes.json
 │   └── imgs/                # 示例图像
 ├── pyScript/                # Python脚本
 │   ├── getOnnx.py           # 导出ResNet18模型
 │   ├── getSimplifiedOnnx.py # 简化模型
 │   ├── testOnnx.py          # 测试模型
 │   └── requirements.txt     # Python依赖
-├── docs/                    # 文档
-    └── model-preparation.md # 模型准备详细指南
-
+└── docs/                    # 文档
+    └── execution-providers-comparison.md
 ```
 
 ## 🚀 快速开始
@@ -70,27 +80,8 @@ webgpu-demo/
 npm install
 
 # 安装Python依赖（可选，用于模型准备）
-cd scripts
+cd pyScript
 pip install -r requirements.txt
-```
-
-### 准备模型文件
-
-```bash
-# 方法一：一键快速开始（推荐）
-python scripts/quick_start.py
-
-# 方法二：分步执行
-# 1. 使用模型管理脚本
-python pyScript/manage_models.py
-
-# 2. 或者单独执行各个步骤
-python pyScript/getOnnx.py              # 导出模型
-python pyScript/getSimplifiedOnnx.py    # 简化模型
-python pyScript/testOnnx.py             # 测试模型
-
-# 3. 或者手动下载模型文件到 public/models/ 目录
-# 详细说明请参考 docs/model-preparation.md
 ```
 
 ### 启动开发服务器
@@ -111,135 +102,78 @@ npm run build
 npm run preview
 ```
 
-## 📖 使用指南
+## 📖 功能特性
 
-### 0. 模型准备
-- 首次使用需要准备模型文件
-- 运行 `python pyScript/manage_models.py` 自动准备模型
-- 或参考 `docs/model-preparation.md` 手动准备
+### 🖼️ 图像分类
+- 使用预训练的 ResNet 模型进行高精度图像分类
+- 支持多种图像格式 (JPEG, PNG, WebP)
+- 实时推理结果展示
+- 拖拽上传支持
 
-### 1. 模型选择
-- 在"模型配置"区域选择要使用的 AI 模型
-- 当前支持 ResNet18 和 ResNet18-Simplified 模型
+### 🎨 风格迁移
+- 将艺术风格应用到您的照片上
+- 预设多种艺术风格 (梵高、莫奈、毕加索等)
+- 自定义风格图像上传
+- 高质量输出结果
 
-### 2. 图像上传
-- 点击"选择图像"按钮或直接拖拽图像到上传区域
-- 支持 JPEG、PNG、WebP 格式，最大 10MB
+### 🎯 目标检测
+- 实时检测图像中的多个对象
+- 支持多种检测模型 (YOLO, SSD, Faster R-CNN)
+- 边界框和类别信息显示
+- 检测统计和性能指标
 
-### 3. 开始推理
-- 上传图像后，点击"开始推理"按钮
-- 系统将使用选定的模型进行图像分类
+### 📝 文本生成
+- 基于 AI 模型的智能文本生成
+- 支持多种语言模型 (GPT-2, BERT, T5)
+- 自定义提示词输入
+- 结果复制和下载功能
 
-### 4. 查看结果
-- 推理完成后，将显示 Top-5 预测结果
-- 每个结果包含类别名称和置信度百分比
-- 同时显示推理时间和性能指标
+### 📊 性能测试
+- 对比不同执行提供者的性能表现
+- WebGPU vs WebGL vs WebAssembly
+- 详细的性能指标和图表
+- 结果导出为 CSV 格式
+
+### ⚡ WebGPU 演示
+- 展示 WebGPU 原生功能的图形渲染
+- 实时动画和性能监控
+- FPS 显示和性能统计
+- 交互式控制面板
 
 ## 🔧 开发指南
 
-### 架构设计
+### 添加新页面
 
-项目采用模块化架构，主要包含以下核心模块：
-
-#### 1. WebGPUApp (主应用类)
-- 负责应用初始化和整体流程控制
-- 协调各个模块之间的交互
-
-#### 2. ModelManager (模型管理器)
-- 负责 ONNX 模型的加载和管理
-- 提供统一的推理接口
-- 支持多模型切换
-
-#### 3. ImageProcessor (图像处理器)
-- 处理图像预处理和格式转换
-- 验证图像文件格式和大小
-- 创建 ONNX Tensor
-
-#### 4. UI (界面组件)
-- 管理所有界面元素的创建和更新
-- 提供统一的用户交互接口
-- 处理状态显示和错误反馈
-
-### Python脚本架构
-
-#### 1. manage_models.py (统一管理脚本)
-- 整合所有模型相关操作
-- 支持分步执行和批量处理
-- 提供命令行参数控制
-
-#### 2. getOnnx.py (模型导出脚本)
-- 从PyTorch导出ResNet18模型
-- 包含模型验证和推理测试
-- 支持自定义输出路径
-
-#### 3. getSimplifiedOnnx.py (模型简化脚本)
-- 使用onnxsim简化模型
-- 比较原始和简化模型性能
-- 减少模型大小和推理时间
-
-#### 4. testOnnx.py (模型测试脚本)
-- 全面的模型功能测试
-- 性能基准测试和比较
-- 支持多模型并行测试
-
-### 添加新模型
-
-1. 将 ONNX 模型文件放入 `public/models/` 目录
-2. 在 `ModelManager.getAvailableModels()` 中添加模型配置：
-
-```javascript
-{
-  name: 'Your Model Name',
-  path: '/models/your_model.onnx',
-  description: '模型描述',
-  inputSize: 224, // 输入尺寸
-  labelsPath: '/models/your_labels.json'
-}
-```
-
-### Python脚本使用
-
-#### 统一管理（推荐）
-```bash
-# 执行所有步骤
-python pyScript/manage_models.py
-
-# 执行特定步骤
-python pyScript/manage_models.py --step export    # 只导出模型
-python pyScript/manage_models.py --step simplify  # 只简化模型
-python pyScript/manage_models.py --step test      # 只测试模型
-python pyScript/manage_models.py --step labels    # 只下载标签
-python pyScript/manage_models.py --step config    # 只创建配置
-
-# 跳过测试步骤
-python pyScript/manage_models.py --skip-test
-```
-
-#### 单独执行
-```bash
-# 导出模型
-python pyScript/getOnnx.py
-
-# 简化模型
-python pyScript/getSimplifiedOnnx.py
-
-# 测试模型
-python pyScript/testOnnx.py
-```
+1. 在 `src/pages/` 目录下创建新的页面组件
+2. 在 `src/App.jsx` 中添加路由配置
+3. 在 `src/components/Layout.jsx` 中添加导航菜单项
 
 ### 自定义样式
 
-项目使用 CSS 变量系统，可以通过修改 `:root` 中的变量来自定义主题：
+项目使用 Tailwind CSS，可以通过以下方式自定义：
 
 ```css
-:root {
-  --primary-color: #your-color;
-  --secondary-color: #your-color;
-  /* 更多变量... */
+/* 在 src/index.css 中添加自定义样式 */
+@layer components {
+  .custom-button {
+    @apply px-4 py-2 bg-blue-500 text-white rounded-md;
+  }
 }
 ```
 
+### 添加新功能
+
+1. 创建新的组件文件
+2. 在相应的页面中导入和使用
+3. 更新状态管理和事件处理
+4. 添加必要的类型定义和验证
+
 ## 🎯 性能优化
+
+### React 优化
+- 使用 React.memo 优化组件重渲染
+- 合理使用 useCallback 和 useMemo
+- 避免不必要的状态更新
 
 ### WebGPU 优化
 - 使用 WebGPU 执行提供者进行 GPU 加速
@@ -250,11 +184,6 @@ python pyScript/testOnnx.py
 - 使用 OffscreenCanvas 进行图像预处理
 - 实现图像格式验证和大小限制
 - 优化内存使用，及时释放资源
-
-### UI 性能优化
-- 使用 CSS 变量减少重绘
-- 实现懒加载和虚拟滚动
-- 优化动画性能
 
 ## 🔍 故障排除
 
@@ -300,8 +229,9 @@ python pyScript/testOnnx.py
 
 - [ONNX Runtime Web](https://github.com/microsoft/onnxruntime) - 提供强大的 Web 端推理能力
 - [WebGPU](https://www.w3.org/TR/webgpu/) - 下一代 Web 图形 API
-- [Font Awesome](https://fontawesome.com/) - 提供精美图标
-- [Inter Font](https://rsms.me/inter/) - 现代化字体设计
+- [React](https://reactjs.org/) - 现代化前端框架
+- [Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架
+- [Framer Motion](https://www.framer.com/motion/) - 强大的动画库
 
 ## 📞 联系方式
 
