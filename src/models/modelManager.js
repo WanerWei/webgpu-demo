@@ -76,7 +76,7 @@ export class ModelManager {
 
       // 并行加载模型和标签
       const [session, labels] = await Promise.all([
-        ort.InferenceSession.create(modelPath, sessionOptions),
+        window.ort.InferenceSession.create(modelPath, sessionOptions),
         this.loadLabels(labelsPath)
       ]);
 
@@ -186,7 +186,7 @@ export class ModelManager {
         console.log('其他后端：使用固定批次大小形状:', correctShape);
       }
       
-      const correctedTensor = new ort.Tensor(inputTensor.type, inputTensor.data, correctShape);
+      const correctedTensor = new window.ort.Tensor(inputTensor.type, inputTensor.data, correctShape);
       console.log('修正后的张量形状:', correctedTensor.dims);
 
       console.log('inputName :>> ', inputName);

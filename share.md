@@ -123,3 +123,11 @@ console.log(embedding);
 ## 9. 总结
 
 WebGPU 的出现，使得 **浏览器端 AI 推理** 从理论变为现实。通过结合轻量化模型、Compute Shader 优化与分布式加载技术，我们可以在浏览器中直接运行 LLM、图像生成、视觉 AI 等复杂任务。未来，随着浏览器支持的普及和工具链的完善，WebGPU + AI 将成为端侧智能的重要方向，赋能更多创新应用。
+
+https://developer.chrome.com/blog/io24-webassembly-webgpu-1?utm_source=chatgpt.com&hl=zh-cn
+
+https://appwrite.io/blog/post/chatbot-with-webllm-and-webgpu?utm_source=chatgpt.com
+
+https://ebenezerdon.github.io/simple-webllm-chat/
+
+https://webgpu.github.io/webgpu-samples/?sample=imageBlur#main.ts·

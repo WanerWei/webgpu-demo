@@ -50,7 +50,7 @@ export class ImageProcessor {
     
     console.log('创建张量，形状:', tensorShape, '数据类型:', typeof data, '数据长度:', data.length);
     
-    return new ort.Tensor("float32", data, tensorShape);
+    return new window.ort.Tensor("float32", data, tensorShape);
   }
 
   /**
