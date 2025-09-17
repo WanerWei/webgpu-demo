@@ -9,6 +9,7 @@ import ObjectDetection from './pages/ObjectDetection';
 import TextGeneration from './pages/TextGeneration';
 import PerformanceDemo from './pages/PerformanceDemo';
 import WebGPUDemo from './pages/WebGPUDemo';
+import MarkdownPreview from './pages/MarkdownPreview';
 import About from './pages/About';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
             <Route path="/text-generation" element={<TextGeneration />} />
             <Route path="/performance-demo" element={<PerformanceDemo />} />
             <Route path="/webgpu-demo" element={<WebGPUDemo />} />
+            <Route path="/markdown-preview" element={<MarkdownPreview />} />
             <Route path="/about" element={<About />} />
           </Routes>
         </Layout>

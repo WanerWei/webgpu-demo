@@ -13,7 +13,8 @@ import {
   Cpu, 
   Info,
   Github,
-  ExternalLink
+  ExternalLink,
+  FileText
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -28,6 +29,7 @@ const Layout = ({ children }) => {
     { name: '文本生成', href: '/text-generation', icon: Type },
     { name: '性能测试', href: '/performance-demo', icon: BarChart3 },
     { name: 'WebGPU演示', href: '/webgpu-demo', icon: Cpu },
+    { name: 'Markdown预览', href: '/markdown-preview', icon: FileText },
     { name: '关于项目', href: '/about', icon: Info },
   ];
 
@@ -51,7 +53,7 @@ const Layout = ({ children }) => {
 
             {/* 桌面端导航 */}
             <div className="hidden md:flex items-center space-x-8">
-              {navigation.slice(1, 5).map((item) => (
+              {navigation.slice(1, 6).map((item) => (
                 <Link
                   key={item.name}
                   to={item.href}
@@ -166,6 +168,7 @@ const Layout = ({ children }) => {
                 <li>• React 18</li>
                 <li>• Tailwind CSS</li>
                 <li>• Framer Motion</li>
+                <li>• React Markdown</li>
               </ul>
             </div>
             
