@@ -20,14 +20,32 @@ export class ModelManager {
         path: '/models/resnet18.onnx',
         description: 'ResNet18 图像分类模型',
         inputSize: 224,
-        labelsPath: '/models/imagenet_classes.json'
+        labelsPath: '/models/imagenet_classes.json',
+        type: 'classification'
       },
       {
         name: 'ResNet18-Simplified',
         path: '/models/resnet18_simplified.onnx',
         description: '简化版 ResNet18 模型',
         inputSize: 224,
-        labelsPath: '/models/imagenet_classes.json'
+        labelsPath: '/models/imagenet_classes.json',
+        type: 'classification'
+      },
+      {
+        name: 'YOLOv8n',
+        path: '/models/yolov8n.onnx',
+        description: 'YOLOv8 Nano 目标检测模型',
+        inputSize: 640,
+        labelsPath: '/models/coco_classes.json',
+        type: 'detection'
+      },
+      {
+        name: 'StyleTransfer',
+        path: '/models/mosaic-9.onnx',
+        description: '神经风格迁移模型',
+        inputSize: 224,
+        labelsPath: null,
+        type: 'style_transfer'
       }
     ];
   }
@@ -74,11 +92,20 @@ export class ModelManager {
           sessionOptions.executionProviders = ["webgpu"];
       }
 
-      // 并行加载模型和标签
-      const [session, labels] = await Promise.all([
-        window.ort.InferenceSession.create(modelPath, sessionOptions),
-        this.loadLabels(labelsPath)
-      ]);
+      // 并行加载模型和标签（如果labelsPath不为null）
+      const loadPromises = [
+        window.ort.InferenceSession.create(modelPath, sessionOptions)
+      ];
+      
+      // 只有当labelsPath不为null时才加载标签
+      if (labelsPath) {
+        loadPromises.push(this.loadLabels(labelsPath));
+      } else {
+        // 对于不需要标签的模型（如风格迁移），使用空数组
+        loadPromises.push(Promise.resolve([]));
+      }
+      
+      const [session, labels] = await Promise.all(loadPromises);
 
       this.session = session;
       this.classLabels = labels;
@@ -208,6 +235,171 @@ export class ModelManager {
       console.error('推理失败:', error);
       throw new Error(`推理失败: ${error.message}`);
     }
+  }
+
+  /**
+   * 执行目标检测推理
+   * @param {ort.Tensor} inputTensor - 输入张量
+   * @returns {Promise<Object>} 检测结果
+   */
+  async runDetectionInference(inputTensor) {
+    if (!this.session) {
+      throw new Error('模型未加载，请先加载模型');
+    }
+
+    try {
+      // 获取模型的输入信息
+      const inputNames = this.session.inputNames;
+      const inputName = inputNames && inputNames.length > 0 ? inputNames[0] : 'images';
+      
+      console.log('检测模型输入信息:', {
+        inputNames: this.session.inputNames,
+        inputTensorShape: inputTensor.dims,
+        inputTensorType: inputTensor.type,
+        inputName: inputName
+      });
+
+      const feeds = { [inputName]: inputTensor };
+      const results = await this.session.run(feeds);
+      
+      // YOLO模型通常输出 [batch, num_detections, 85] 格式
+      // 85 = 4 (bbox) + 1 (confidence) + 80 (class probabilities)
+      const output = results[Object.keys(results)[0]];
+      const data = output.data;
+      const shape = output.dims;
+      
+      console.log('检测输出形状:', shape);
+      
+      // 解析检测结果
+      const detections = this.parseYOLOOutput(data, shape);
+      
+      return {
+        detections,
+        rawData: data,
+        modelName: this.currentModel
+      };
+    } catch (error) {
+      console.error('检测推理失败:', error);
+      throw new Error(`检测推理失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 解析YOLO输出
+   * @param {Float32Array} data - 模型输出数据
+   * @param {Array} shape - 输出形状
+   * @returns {Array} 检测结果数组
+   */
+  parseYOLOOutput(data, shape) {
+    const detections = [];
+    const [batch, numDetections, numValues] = shape;
+    
+    // 置信度阈值
+    const confidenceThreshold = 0.5;
+    // NMS阈值
+    const nmsThreshold = 0.4;
+    
+    for (let i = 0; i < numDetections; i++) {
+      const offset = i * numValues;
+      
+      // 获取边界框坐标 (center_x, center_y, width, height)
+      const centerX = data[offset];
+      const centerY = data[offset + 1];
+      const width = data[offset + 2];
+      const height = data[offset + 3];
+      
+      // 获取置信度
+      const confidence = data[offset + 4];
+      
+      if (confidence < confidenceThreshold) continue;
+      
+      // 获取类别概率
+      let maxClassScore = 0;
+      let classId = 0;
+      for (let j = 5; j < numValues; j++) {
+        if (data[offset + j] > maxClassScore) {
+          maxClassScore = data[offset + j];
+          classId = j - 5;
+        }
+      }
+      
+      const finalScore = confidence * maxClassScore;
+      if (finalScore < confidenceThreshold) continue;
+      
+      // 转换边界框格式 (center -> corner)
+      const x1 = centerX - width / 2;
+      const y1 = centerY - height / 2;
+      const x2 = centerX + width / 2;
+      const y2 = centerY + height / 2;
+      
+      detections.push({
+        bbox: [x1, y1, x2, y2],
+        confidence: finalScore,
+        classId: classId,
+        label: this.classLabels[classId] || `Class ${classId}`
+      });
+    }
+    
+    // 应用NMS (Non-Maximum Suppression)
+    return this.applyNMS(detections, nmsThreshold);
+  }
+
+  /**
+   * 应用非极大值抑制
+   * @param {Array} detections - 检测结果
+   * @param {number} threshold - NMS阈值
+   * @returns {Array} 过滤后的检测结果
+   */
+  applyNMS(detections, threshold) {
+    // 按置信度排序
+    detections.sort((a, b) => b.confidence - a.confidence);
+    
+    const filtered = [];
+    const suppressed = new Set();
+    
+    for (let i = 0; i < detections.length; i++) {
+      if (suppressed.has(i)) continue;
+      
+      filtered.push(detections[i]);
+      
+      // 计算与其他检测框的IoU
+      for (let j = i + 1; j < detections.length; j++) {
+        if (suppressed.has(j)) continue;
+        
+        const iou = this.calculateIoU(detections[i].bbox, detections[j].bbox);
+        if (iou > threshold) {
+          suppressed.add(j);
+        }
+      }
+    }
+    
+    return filtered;
+  }
+
+  /**
+   * 计算IoU (Intersection over Union)
+   * @param {Array} box1 - 边界框1 [x1, y1, x2, y2]
+   * @param {Array} box2 - 边界框2 [x1, y1, x2, y2]
+   * @returns {number} IoU值
+   */
+  calculateIoU(box1, box2) {
+    const [x1_1, y1_1, x2_1, y2_1] = box1;
+    const [x1_2, y1_2, x2_2, y2_2] = box2;
+    
+    // 计算交集
+    const x1 = Math.max(x1_1, x1_2);
+    const y1 = Math.max(y1_1, y1_2);
+    const x2 = Math.min(x2_1, x2_2);
+    const y2 = Math.min(y2_1, y2_2);
+    
+    if (x2 <= x1 || y2 <= y1) return 0;
+    
+    const intersection = (x2 - x1) * (y2 - y1);
+    const area1 = (x2_1 - x1_1) * (y2_1 - y1_1);
+    const area2 = (x2_2 - x1_2) * (y2_2 - y1_2);
+    const union = area1 + area2 - intersection;
+    
+    return intersection / union;
   }
 
   /**
@@ -358,6 +550,64 @@ export class ModelManager {
     };
 
     return info;
+  }
+
+  /**
+   * 执行风格迁移推理
+   * @param {ort.Tensor} contentTensor - 内容图像张量
+   * @param {ort.Tensor} styleTensor - 风格图像张量
+   * @returns {Promise<Object>} 风格迁移结果
+   */
+  async runStyleTransferInference(contentTensor, styleTensor) {
+    if (!this.session) {
+      throw new Error('模型未加载，请先加载模型');
+    }
+
+    try {
+      // 获取模型的输入信息
+      const inputNames = this.session.inputNames;
+      console.log('风格迁移模型输入信息:', {
+        inputNames: this.session.inputNames,
+        contentTensorShape: contentTensor.dims,
+        styleTensorShape: styleTensor.dims
+      });
+
+      // 构建输入
+      const feeds = {};
+      if (inputNames.includes('content_image')) {
+        feeds['content_image'] = contentTensor;
+      } else if (inputNames.includes('content')) {
+        feeds['content'] = contentTensor;
+      } else {
+        feeds[inputNames[0]] = contentTensor;
+      }
+
+      if (inputNames.includes('style_image')) {
+        feeds['style_image'] = styleTensor;
+      } else if (inputNames.includes('style')) {
+        feeds['style'] = styleTensor;
+      } else if (inputNames.length > 1) {
+        feeds[inputNames[1]] = styleTensor;
+      }
+
+      const results = await this.session.run(feeds);
+      
+      // 获取输出
+      const output = results[Object.keys(results)[0]];
+      const data = output.data;
+      const shape = output.dims;
+      
+      console.log('风格迁移输出形状:', shape);
+      
+      return {
+        outputData: data,
+        outputShape: shape,
+        modelName: this.currentModel
+      };
+    } catch (error) {
+      console.error('风格迁移推理失败:', error);
+      throw new Error(`风格迁移推理失败: ${error.message}`);
+    }
   }
 
   /**

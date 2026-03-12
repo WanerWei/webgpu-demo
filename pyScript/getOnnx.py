@@ -35,3 +35,6 @@ torch.onnx.export(
 )
 
 print("✅ ResNet18 已成功导出为 resnet18.onnx")
+
+# 图片识别结果映射
+# https://github.com/pytorch/hub/blob/master/imagenet_classes.txt

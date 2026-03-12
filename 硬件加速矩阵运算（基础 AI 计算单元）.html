@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>矩阵乘法性能对比（最终完整版）</title>
+    <style>
+      .container {
+        max-width: 1000px;
+        margin: 20px auto;
+        padding: 0 20px;
+      }
+      .result-card {
+        border: 1px solid #eee;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+        background: #f9f9f9;
+      }
+      .result-card h4 {
+        margin: 0 0 10px 0;
+        color: #333;
+      }
+      .metric {
+        margin: 5px 0;
+        line-height: 1.6;
+      }
+      .highlight {
+        color: #409eff;
+        font-weight: bold;
+      }
+      .warning {
+        color: #f56c6c;
+      }
+      .success {
+        color: #67c23a;
+      }
+      .info {
+        color: #909399;
+      }
+      button {
+        padding: 10px 20px;
+        background: #409eff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      #status {
+        margin: 10px 0;
+        color: #666;
+        font-weight: 500;
+      }
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0;
+      }
+      .summary-table th,
+      .summary-table td {
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        text-align: center;
+      }
+      .summary-table th {
+        background: #f2f2f2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h3>1024×1024 矩阵乘法性能对比</h3>
+      <p>
+        测试说明：矩阵元素为Float32类型，计算 C = A × B（1024x1024 × 1024x1024 =
+        1024x1024）
+      </p>
+      <button id="runTestBtn">开始性能测试</button>
+      <div id="status">
+        就绪：点击按钮开始测试（首次运行WebGPU需初始化，稍等）
+      </div>
+
+      <!-- 各方案结果 -->
+      <div class="result-card">
+        <h4>📝 方案1：JavaScript 单线程（CPU）</h4>
+        <div class="metric">
+          计算耗时：<span id="jsTime" class="warning">-- ms</span>
+        </div>
+        <div class="metric">
+          运算效率：<span id="jsFlops" class="warning">-- GFLOPS</span>
+        </div>
+        <div class="metric">结果验证：<span id="jsVerify">--</span></div>
+      </div>
+
+      <div class="result-card">
+        <h4>⚡ 方案2：JavaScript 多线程（CPU，Web Worker）</h4>
+        <div class="metric">
+          计算耗时：<span id="jsMTTime" class="info">-- ms</span>
+        </div>
+        <div class="metric">
+          运算效率：<span id="jsMTFlops" class="info">-- GFLOPS</span>
+        </div>
+        <div class="metric">结果验证：<span id="jsMTVerify">--</span></div>
+      </div>
+
+      <div class="result-card">
+        <h4>🚀 方案3：WebGPU 硬件加速（GPU并行）</h4>
+        <div class="metric">
+          计算耗时：<span id="gpuTime" class="highlight">-- ms</span>
+        </div>
+        <div class="metric">
+          运算效率：<span id="gpuFlops" class="highlight">-- GFLOPS</span>
+        </div>
+        <div class="metric">结果验证：<span id="gpuVerify">--</span></div>
+      </div>
+
+      <!-- 汇总对比表 -->
+      <div class="result-card">
+        <h4>📊 性能汇总对比（以JS单线程为基准）</h4>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>计算方案</th>
+              <th>耗时(ms)</th>
+              <th>GFLOPS</th>
+              <th>提速倍数</th>
+              <th>核心优势</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>JS单线程(CPU)</td>
+              <td id="sumJS">--</td>
+              <td id="sumJSFlops">--</td>
+              <td>1.00</td>
+              <td>无额外开销，易实现</td>
+            </tr>
+            <tr>
+              <td>JS多线程(CPU)</td>
+              <td id="sumJSMT">--</td>
+              <td id="sumJSMTFlops">--</td>
+              <td id="speedupJSMT">--</td>
+              <td>利用CPU多核，无语言门槛</td>
+            </tr>
+            <tr>
+              <td>WebGPU(GPU)</td>
+              <td id="sumGPU">--</td>
+              <td id="sumGPUFlops">--</td>
+              <td id="speedupGPU">--</td>
+              <td>并行计算，大规模矩阵优势极大</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      // 全局配置
+      const MATRIX_SIZE = 1024; // 可调整为256/512/1024，2048需更大内存
+      const WORKER_COUNT = navigator.hardwareConcurrency || 4; // 按CPU核心数分配Worker
+      let matrixA, matrixB, jsResult; // 基准数据（JS单线程结果）
+      let device;
+
+      // ==================== 1. 初始化：测试数据 + 环境 ====================
+      async function init() {
+        document.getElementById("status").innerText = "正在初始化测试数据...";
+
+        // 生成测试矩阵（复制多份，避免Transferable导致缓冲区分离）
+        const rawA = new Float32Array(MATRIX_SIZE * MATRIX_SIZE);
+        const rawB = new Float32Array(MATRIX_SIZE * MATRIX_SIZE);
+        for (let i = 0; i < MATRIX_SIZE * MATRIX_SIZE; i++) {
+          rawA[i] = Math.random() * 0.1; // 归一化数值，避免浮点溢出
+          rawB[i] = Math.random() * 0.1;
+        }
+        matrixA = new Float32Array(rawA);
+        matrixB = new Float32Array(rawB);
+
+        // 初始化WebGPU
+        try {
+          if (navigator.gpu) {
+            const adapter = await navigator.gpu.requestAdapter({
+              powerPreference: "high-performance",
+            });
+            device = adapter ? await adapter.requestDevice() : null;
+          }
+        } catch (err) {
+          console.warn("WebGPU初始化失败：", err);
+          document.getElementById("status").innerText +=
+            " | WebGPU未就绪（仅测试CPU方案）";
+        }
+
+        document.getElementById("status").innerText =
+          "初始化完成，点击按钮开始测试";
+      }
+
+
+      // ==================== 2. 方案1：JS单线程矩阵乘法（CPU） ====================
+      function matrixMultiplyJS(A, B, size) {
+        const result = new Float32Array(size * size);
+        // 三重循环：行×列×累加
+        for (let i = 0; i < size; i++) {
+          for (let j = 0; j < size; j++) {
+            let sum = 0.0;
+            for (let k = 0; k < size; k++) {
+              sum += A[i * size + k] * B[k * size + j];
+            }
+            result[i * size + j] = sum;
+          }
+        }
+        return result;
+      }
+
+      // ==================== 3. 方案2：JS多线程矩阵乘法（Web Worker） ====================
+      function matrixMultiplyJSMT(A, B, size) {
+        return new Promise((resolve) => {
+          const workers = [];
+          const result = new Float32Array(size * size);
+          const rowsPerWorker = Math.ceil(size / WORKER_COUNT);
+
+          // 为每个Worker分配任务
+          for (let w = 0; w < WORKER_COUNT; w++) {
+            const startRow = w * rowsPerWorker;
+            const endRow = Math.min((w + 1) * rowsPerWorker, size);
+            // 复制矩阵数据，避免Transferable转移缓冲区
+            const workerA = new Float32Array(A);
+            const workerB = new Float32Array(B);
+
+            // 创建Worker
+            const worker = new Worker(
+              URL.createObjectURL(
+                new Blob(
+                  [
+                    `
+                        self.onmessage = (e) => {
+                            const { A, B, size, startRow, endRow } = e.data;
+                            const result = new Float32Array((endRow - startRow) * size);
+                            // 计算分配的行
+                            for (let i = startRow; i < endRow; i++) {
+                                for (let j = 0; j < size; j++) {
+                                    let sum = 0.0;
+                                    for (let k = 0; k < size; k++) {
+                                        sum += A[i * size + k] * B[k * size + j];
+                                    }
+                                    result[(i - startRow) * size + j] = sum;
+                                }
+                            }
+                            self.postMessage({ startRow, result });
+                            self.close();
+                        };
+                    `,
+                  ],
+                  { type: "application/javascript" }
+                )
+              )
+            );
+
+            // 接收Worker计算结果
+            worker.onmessage = (e) => {
+              const { startRow, result: workerResult } = e.data;
+              result.set(workerResult, startRow * size);
+              workers.splice(workers.indexOf(worker), 1);
+              // 所有Worker完成后返回结果
+              if (workers.length === 0) resolve(result);
+            };
+
+            // 发送数据（不使用Transferable）
+            worker.postMessage({
+              A: workerA,
+              B: workerB,
+              size: size,
+              startRow: startRow,
+              endRow: endRow,
+            });
+            workers.push(worker);
+          }
+        });
+      }
+
+      // ==================== 5. 方案3：WebGPU矩阵乘法（GPU并行） ====================
+      async function matrixMultiplyWebGPU(A, B, size) {
+        if (!device) throw new Error("WebGPU设备未初始化");
+
+        // 创建GPU缓冲区
+        const createBuffer = (data, usage) => {
+          const buffer = device.createBuffer({
+            size: data.byteLength,
+            usage: usage,
+            mappedAtCreation: true,
+          });
+          new Float32Array(buffer.getMappedRange()).set(data);
+          buffer.unmap();
+          return buffer;
+        };
+
+        // 使用矩阵拷贝创建缓冲区，避免原数据被修改
+        const bufferA = createBuffer(
+          new Float32Array(A),
+          GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+        );
+        const bufferB = createBuffer(
+          new Float32Array(B),
+          GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+        );
+        const bufferC = device.createBuffer({
+          size: A.byteLength,
+          usage:
+            GPUBufferUsage.STORAGE |
+            GPUBufferUsage.COPY_SRC |
+            GPUBufferUsage.COPY_DST,
+        });
+
+        // WebGPU着色器（WGSL）：并行计算每个矩阵元素
+        const shaderModule = device.createShaderModule({
+          code: `
+                    @group(0) @binding(0) var<storage, read> a: array<f32>;
+                    @group(0) @binding(1) var<storage, read> b: array<f32>;
+                    @group(0) @binding(2) var<storage, write> c: array<f32>;
+                    const SIZE: u32 = ${size}u;
+
+                    @compute @workgroup_size(16, 16) // 16x16工作组（适配GPU硬件）
+                    fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+                        let i = id.x; // 行索引
+                        let j = id.y; // 列索引
+                        if (i >= SIZE || j >= SIZE) return; // 超出矩阵范围则退出
+
+                        var sum: f32 = 0.0;
+                        for (var k: u32 = 0u; k < SIZE; k++) {
+                            sum += a[i * SIZE + k] * b[k * SIZE + j];
+                        }
+                        c[i * SIZE + j] = sum;
+                    }
+                `,
+        });
+
+        // 创建计算管线
+        const computePipeline = device.createComputePipeline({
+          layout: "auto",
+          compute: { module: shaderModule, entryPoint: "main" },
+        });
+
+        // 创建绑定组（关联缓冲区和着色器）
+        const bindGroup = device.createBindGroup({
+          layout: computePipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer: bufferA } },
+            { binding: 1, resource: { buffer: bufferB } },
+            { binding: 2, resource: { buffer: bufferC } },
+          ],
+        });
+
+        // 执行计算指令
+        const commandEncoder = device.createCommandEncoder();
+        const passEncoder = commandEncoder.beginComputePass();
+        passEncoder.setPipeline(computePipeline);
+        passEncoder.setBindGroup(0, bindGroup);
+        // 调度工作组（向上取整到16的倍数）
+        const workgroupSize = 16;
+        const workgroupsX = Math.ceil(size / workgroupSize);
+        const workgroupsY = Math.ceil(size / workgroupSize);
+        passEncoder.dispatchWorkgroups(workgroupsX, workgroupsY);
+        passEncoder.end();
+        device.queue.submit([commandEncoder.finish()]);
+        await device.queue.onSubmittedWorkDone();
+
+        // 读取计算结果
+        const readBuffer = device.createBuffer({
+          size: A.byteLength,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        const copyEncoder = device.createCommandEncoder();
+        copyEncoder.copyBufferToBuffer(bufferC, 0, readBuffer, 0, A.byteLength);
+        device.queue.submit([copyEncoder.finish()]);
+        await device.queue.onSubmittedWorkDone();
+
+        // 映射缓冲区到CPU内存
+        await readBuffer.mapAsync(GPUMapMode.READ);
+        const result = new Float32Array(readBuffer.getMappedRange());
+        readBuffer.unmap();
+
+        // 释放GPU资源
+        [
+          bufferA,
+          bufferB,
+          bufferC,
+          readBuffer,
+          shaderModule,
+          computePipeline,
+          bindGroup,
+        ].forEach((obj) => {
+          try {
+            obj.destroy();
+          } catch (e) {}
+        });
+
+        return result;
+      }
+
+      // ==================== 辅助函数：验证+性能计算 ====================
+      // 验证结果一致性（浮点误差容忍度1e-5）
+      function verifyResult(targetResult, baseResult, size) {
+        if (!targetResult || !baseResult) return "未运行";
+        const tolerance = 1e-5;
+        for (let i = 0; i < Math.min(10, size); i++) {
+          const diff = Math.abs(targetResult[i] - baseResult[i]);
+          if (diff > tolerance) {
+            return `不一致（第${i}个元素差：${diff.toFixed(6)}）`;
+          }
+        }
+        return "一致（浮点误差范围内）";
+      }
+
+      // 计算GFLOPS（千兆浮点运算数/秒）
+      function calculateGFLOPS(timeMs, size) {
+        const flops = 2 * Math.pow(size, 3); // 每个元素：size次乘法 + size次加法
+        const gflops = flops / 1e9 / (timeMs / 1000); // 转换为GFLOPS
+        return gflops.toFixed(2);
+      }
+
+      // ==================== 主测试函数 ====================
+      async function runTest() {
+        const btn = document.getElementById("runTestBtn");
+        btn.disabled = true;
+        document.getElementById("status").innerText = "正在执行测试...";
+
+        // ========== 步骤1：JS单线程（基准） ==========
+        let jsTimeMs;
+        try {
+          document.getElementById("status").innerText =
+            "正在执行JS单线程计算（CPU）...";
+          const startTime = performance.now();
+          jsResult = matrixMultiplyJS(matrixA, matrixB, MATRIX_SIZE);
+          jsTimeMs = performance.now() - startTime;
+
+          // 更新结果
+          document.getElementById("jsTime").innerText =
+            jsTimeMs.toFixed(2) + " ms";
+          document.getElementById("jsFlops").innerText =
+            calculateGFLOPS(jsTimeMs, MATRIX_SIZE) + " GFLOPS";
+          document.getElementById("jsVerify").innerText = "有效（基准）";
+          // 汇总表
+          document.getElementById("sumJS").innerText = jsTimeMs.toFixed(2);
+          document.getElementById("sumJSFlops").innerText = calculateGFLOPS(
+            jsTimeMs,
+            MATRIX_SIZE
+          );
+        } catch (err) {
+          document.getElementById("jsTime").innerText = "失败";
+          document.getElementById("jsFlops").innerText = "0";
+          document.getElementById(
+            "jsVerify"
+          ).innerText = `错误：${err.message}`;
+          btn.disabled = false;
+          return;
+        }
+
+        // ========== 步骤2：JS多线程 ==========
+        let jsMTResult, jsMTTimeMs;
+        try {
+          document.getElementById(
+            "status"
+          ).innerText = `正在执行JS多线程计算（${WORKER_COUNT}核）...`;
+          const startTime = performance.now();
+          jsMTResult = await matrixMultiplyJSMT(matrixA, matrixB, MATRIX_SIZE);
+          jsMTTimeMs = performance.now() - startTime;
+
+          // 更新结果
+          document.getElementById("jsMTTime").innerText =
+            jsMTTimeMs.toFixed(2) + " ms";
+          document.getElementById("jsMTFlops").innerText =
+            calculateGFLOPS(jsMTTimeMs, MATRIX_SIZE) + " GFLOPS";
+          document.getElementById("jsMTVerify").innerText = verifyResult(
+            jsMTResult,
+            jsResult,
+            MATRIX_SIZE
+          );
+          // 汇总表
+          document.getElementById("sumJSMT").innerText = jsMTTimeMs.toFixed(2);
+          document.getElementById("sumJSMTFlops").innerText = calculateGFLOPS(
+            jsMTTimeMs,
+            MATRIX_SIZE
+          );
+          document.getElementById("speedupJSMT").innerText = (
+            jsTimeMs / jsMTTimeMs
+          ).toFixed(2);
+        } catch (err) {
+          document.getElementById("jsMTTime").innerText = "失败";
+          document.getElementById("jsMTFlops").innerText = "0";
+          document.getElementById(
+            "jsMTVerify"
+          ).innerText = `错误：${err.message}`;
+          document.getElementById("sumJSMT").innerText = "失败";
+          document.getElementById("sumJSMTFlops").innerText = "0";
+          document.getElementById("speedupJSMT").innerText = "0";
+        }
+
+        // ========== 步骤3：WebGPU ==========
+        let gpuResult, gpuTimeMs;
+        try {
+          if (device) {
+            document.getElementById("status").innerText =
+              "正在执行WebGPU计算（GPU）...";
+            const startTime = performance.now();
+            gpuResult = await matrixMultiplyWebGPU(
+              matrixA,
+              matrixB,
+              MATRIX_SIZE
+            );
+            gpuTimeMs = performance.now() - startTime;
+
+            // 更新结果
+            document.getElementById("gpuTime").innerText =
+              gpuTimeMs.toFixed(2) + " ms";
+            document.getElementById("gpuFlops").innerText =
+              calculateGFLOPS(gpuTimeMs, MATRIX_SIZE) + " GFLOPS";
+            document.getElementById("gpuVerify").innerText = verifyResult(
+              gpuResult,
+              jsResult,
+              MATRIX_SIZE
+            );
+            // 汇总表
+            document.getElementById("sumGPU").innerText = gpuTimeMs.toFixed(2);
+            document.getElementById("sumGPUFlops").innerText = calculateGFLOPS(
+              gpuTimeMs,
+              MATRIX_SIZE
+            );
+            document.getElementById("speedupGPU").innerText = (
+              jsTimeMs / gpuTimeMs
+            ).toFixed(2);
+          } else {
+            document.getElementById("gpuTime").innerText = "未初始化";
+            document.getElementById("gpuFlops").innerText = "0";
+            document.getElementById("gpuVerify").innerText = "WebGPU未加载";
+            document.getElementById("sumGPU").innerText = "未运行";
+            document.getElementById("sumGPUFlops").innerText = "0";
+            document.getElementById("speedupGPU").innerText = "0";
+          }
+        } catch (err) {
+          document.getElementById("gpuTime").innerText = "失败";
+          document.getElementById("gpuFlops").innerText = "0";
+          document.getElementById(
+            "gpuVerify"
+          ).innerText = `错误：${err.message}`;
+          document.getElementById("sumGPU").innerText = "失败";
+          document.getElementById("sumGPUFlops").innerText = "0";
+          document.getElementById("speedupGPU").innerText = "0";
+        }
+
+        // 测试完成
+        document.getElementById("status").innerText = "测试完成！";
+        btn.disabled = false;
+      }
+
+      // ==================== 页面初始化 ====================
+      window.onload = init;
+      document.getElementById("runTestBtn").addEventListener("click", runTest);
+    </script>
+  </body>
+</html>

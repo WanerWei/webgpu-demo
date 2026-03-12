@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, Play, Download, Loader2, Cpu, HardDrive, Clock } from 'lucide-react';
+import { ModelManager } from '../models/modelManager';
+import { ImageProcessor } from '../utils/imageProcessor';
 
 const PerformanceDemo = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState(null);
   const [selectedTests, setSelectedTests] = useState(['webgpu', 'webgl', 'wasm']);
+  const [error, setError] = useState(null);
+  const [testImage, setTestImage] = useState(null);
   
   const testProviders = [
     { id: 'webgpu', name: 'WebGPU', description: '新一代Web图形API' },
@@ -13,44 +17,133 @@ const PerformanceDemo = () => {
     { id: 'wasm', name: 'WebAssembly', description: 'Web汇编语言' }
   ];
 
-  const runPerformanceTest = async () => {
-    setIsRunning(true);
-    
-    // 模拟性能测试
-    setTimeout(() => {
-      const mockResults = [
-        {
-          provider: 'webgpu',
-          avgTime: 125.6,
-          stdTime: 12.3,
-          memoryUsage: 45.2,
-          memoryPeak: 52.1,
-          iterations: 10,
-          status: 'success'
-        },
-        {
-          provider: 'webgl',
-          avgTime: 189.4,
-          stdTime: 18.7,
-          memoryUsage: 52.1,
-          memoryPeak: 58.3,
-          iterations: 10,
-          status: 'success'
-        },
-        {
-          provider: 'wasm',
-          avgTime: 456.8,
-          stdTime: 45.2,
-          memoryUsage: 38.9,
-          memoryPeak: 42.1,
-          iterations: 10,
-          status: 'success'
-        }
-      ];
+  // 生成测试图像
+  useEffect(() => {
+    const generateTestImage = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 224;
+      canvas.height = 224;
       
-      setResults(mockResults);
+      // 绘制测试图像
+      const gradient = ctx.createLinearGradient(0, 0, 224, 224);
+      gradient.addColorStop(0, '#ff6b6b');
+      gradient.addColorStop(0.5, '#4ecdc4');
+      gradient.addColorStop(1, '#45b7d1');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 224, 224);
+      
+      // 添加一些几何图形
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.arc(112, 112, 50, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(50, 50, 100, 100);
+      
+      setTestImage(canvas.toDataURL());
+    };
+
+    generateTestImage();
+  }, []);
+
+  const runPerformanceTest = async () => {
+    if (!testImage) {
+      setError('测试图像未生成');
+      return;
+    }
+
+    setIsRunning(true);
+    setError(null);
+    setResults(null);
+    
+    try {
+      const testResults = [];
+      const iterations = 5; // 减少迭代次数以加快测试
+      
+      for (const provider of selectedTests) {
+        console.log(`开始测试 ${provider} 执行提供者...`);
+        
+        try {
+          // 创建模型管理器
+          const modelManager = new ModelManager();
+          
+          // 获取模型配置
+          const models = ModelManager.getAvailableModels();
+          const model = models.find(m => m.type === 'classification');
+          
+          if (!model) {
+            throw new Error('未找到分类模型');
+          }
+          
+          // 加载模型
+          await modelManager.loadModel(model.path, model.labelsPath, provider);
+          
+          // 准备测试数据
+          const img = new Image();
+          img.src = testImage;
+          await new Promise(resolve => {
+            img.onload = resolve;
+          });
+          
+          const imageData = ImageProcessor.preprocessImage(img, model.inputSize, 'classification');
+          const tensor = ImageProcessor.createTensor(imageData, model.inputSize);
+          
+          // 执行多次推理测试
+          const times = [];
+          const memoryBefore = performance.memory ? performance.memory.usedJSHeapSize : 0;
+          
+          for (let i = 0; i < iterations; i++) {
+            const startTime = performance.now();
+            await modelManager.runInference(tensor);
+            const endTime = performance.now();
+            times.push(endTime - startTime);
+          }
+          
+          const memoryAfter = performance.memory ? performance.memory.usedJSHeapSize : 0;
+          
+          // 计算统计信息
+          const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
+          const variance = times.reduce((sum, time) => sum + Math.pow(time - avgTime, 2), 0) / times.length;
+          const stdTime = Math.sqrt(variance);
+          
+          testResults.push({
+            provider: provider,
+            avgTime: avgTime,
+            stdTime: stdTime,
+            memoryUsage: (memoryAfter - memoryBefore) / 1024 / 1024, // MB
+            memoryPeak: memoryAfter / 1024 / 1024, // MB
+            iterations: iterations,
+            status: 'success'
+          });
+          
+          console.log(`${provider} 测试完成: ${avgTime.toFixed(1)}ms`);
+          
+        } catch (error) {
+          console.error(`${provider} 测试失败:`, error);
+          testResults.push({
+            provider: provider,
+            avgTime: 0,
+            stdTime: 0,
+            memoryUsage: 0,
+            memoryPeak: 0,
+            iterations: 0,
+            status: 'failed',
+            error: error.message
+          });
+        }
+      }
+      
+      setResults(testResults);
+      
+    } catch (error) {
+      console.error('性能测试失败:', error);
+      setError(`性能测试失败: ${error.message}`);
+    } finally {
       setIsRunning(false);
-    }, 5000);
+    }
   };
 
   const downloadResults = () => {
@@ -104,6 +197,48 @@ const PerformanceDemo = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* 左侧控制面板 */}
           <div className="space-y-6">
+            {/* 错误显示 */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="bg-red-50 border border-red-200 rounded-lg p-4"
+              >
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">错误</h3>
+                    <div className="mt-2 text-sm text-red-700">
+                      {error}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* 测试图像预览 */}
+            {testImage && (
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 }}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  测试图像
+                </h3>
+                <div className="flex justify-center">
+                  <img
+                    src={testImage}
+                    alt="测试图像"
+                    className="w-32 h-32 object-cover rounded-lg border border-gray-300"
+                  />
+                </div>
+                <p className="text-sm text-gray-600 text-center mt-2">
+                  224×224 像素测试图像
+                </p>
+              </motion.div>
+            )}
+
             {/* 测试配置 */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -193,15 +328,21 @@ const PerformanceDemo = () => {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">测试次数:</span>
-                  <span className="font-medium">10</span>
+                  <span className="font-medium">5</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">测试模型:</span>
-                  <span className="font-medium">ResNet18</span>
+                  <span className="font-medium">ResNet18-Simplified</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">输入尺寸:</span>
                   <span className="font-medium">224×224</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">WebGPU 支持:</span>
+                  <span className={ModelManager.checkWebGPUSupport() ? 'text-green-600' : 'text-red-600'}>
+                    {ModelManager.checkWebGPUSupport() ? '是' : '否'}
+                  </span>
                 </div>
               </div>
             </motion.div>
@@ -336,19 +477,24 @@ const PerformanceDemo = () => {
                       {results.map((result, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {result.provider.toUpperCase()}
+                            <div className="flex items-center">
+                              {result.provider.toUpperCase()}
+                              {result.status === 'failed' && (
+                                <span className="ml-2 text-xs text-red-600">(失败)</span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {result.avgTime.toFixed(1)}
+                            {result.status === 'success' ? result.avgTime.toFixed(1) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {result.stdTime.toFixed(1)}
+                            {result.status === 'success' ? result.stdTime.toFixed(1) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {result.memoryUsage.toFixed(1)}
+                            {result.status === 'success' ? result.memoryUsage.toFixed(1) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {result.memoryPeak.toFixed(1)}
+                            {result.status === 'success' ? result.memoryPeak.toFixed(1) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {result.iterations}
